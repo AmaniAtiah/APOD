@@ -8,21 +8,12 @@ import com.android.volley.Request;
 import com.android.volley.RequestQueue;
 import com.android.volley.toolbox.Volley;
 import com.barmej.astoronmypictureoftheday.R;
-
-import java.io.IOException;
-import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.util.Scanner;
-
-import javax.net.ssl.HttpsURLConnection;
-
 
 public class NetworkUtils {
     private static String TAG = NetworkUtils.class.getSimpleName();
-
     private static final String BASE_URL = "https://api.nasa.gov";
-
     private static final String PICTURES_ENDPOINT = "/planetary/apod";
     private static final String API_KEY = "api_key";
     private static final String DATE = "date";
@@ -37,18 +28,14 @@ public class NetworkUtils {
         if(sInstance == null){
             synchronized (LOCK){
                 if(sInstance == null) sInstance = new NetworkUtils(context);
-
             }
         }
         return sInstance;
-
     }
-
 
     private NetworkUtils(Context context) {
         mContext = context.getApplicationContext();
         mRequestQueue = getRequestQueue();
-
     }
 
     public RequestQueue getRequestQueue(){
@@ -62,24 +49,17 @@ public class NetworkUtils {
         getRequestQueue().add(request);
     }
 
-
     public void  cancelRequest(String tag){
         getRequestQueue().cancelAll(tag);
     }
-
 
     public static URL getPictureUrl(Context context, String date){
         return buildUrl(context, PICTURES_ENDPOINT, date);
 
     }
 
-
-
-
     private static URL buildUrl(Context context, String endPoint, String date) {
         Uri.Builder uriBuilder = Uri.parse(BASE_URL + endPoint).buildUpon();
-
-
         if (date != null) {
             uriBuilder.appendQueryParameter(DATE, date);
         }

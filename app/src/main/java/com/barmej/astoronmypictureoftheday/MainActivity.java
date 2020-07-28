@@ -1,6 +1,6 @@
 package com.barmej.astoronmypictureoftheday;
 
-import androidx.annotation.NonNull;
+import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.constraintlayout.widget.ConstraintLayout;
 import androidx.core.view.GravityCompat;
@@ -9,26 +9,23 @@ import androidx.fragment.app.DialogFragment;
 
 import android.annotation.SuppressLint;
 import android.app.DatePickerDialog;
-import android.app.Dialog;
 import android.app.DownloadManager;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.database.Cursor;
+import android.content.SharedPreferences;
+import android.content.res.Configuration;
 import android.graphics.Bitmap;
-import android.graphics.Color;
 import android.graphics.drawable.BitmapDrawable;
-import android.graphics.drawable.ColorDrawable;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
-import android.os.Environment;
 import android.provider.MediaStore;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
-import android.view.Window;
-import android.view.WindowManager;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.DatePicker;
@@ -41,20 +38,31 @@ import com.android.volley.VolleyError;
 import com.android.volley.toolbox.JsonObjectRequest;
 import com.barmej.astoronmypictureoftheday.entity.NasaPicture;
 import com.barmej.astoronmypictureoftheday.network.NetworkUtils;
-import com.barmej.astoronmypictureoftheday.utils.OpenPictureDataParser;
-import com.google.android.material.bottomsheet.BottomSheetBehavior;
+import com.barmej.astoronmypictureoftheday.utils.APODData;
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 import com.ortiz.touchview.TouchImageView;
 import com.squareup.picasso.Picasso;
 import org.json.JSONException;
 import org.json.JSONObject;
+
+import java.io.File;
+import java.lang.reflect.Type;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.Locale;
 
 
 public class MainActivity extends AppCompatActivity implements DatePickerDialog.OnDateSetListener {
 
     private static final String TAG = MainActivity.class.getSimpleName();
+    private static final String BUNDLE_CURRENT_ANSWER = "BUNDLE_CURRENT_ANSWER";
+    public static final String SHARED_PREFS = "SHARED_PREFS";
+    public static final String TEXT = "TEXT";
+    private static final String TYPE = "type";
+    private static final String TASK_LIST= "task list";
+
     private TouchImageView mNasaPictureImageView;
     private WebView mWebView;
     private TextView mTitle;
@@ -64,12 +72,16 @@ public class MainActivity extends AppCompatActivity implements DatePickerDialog.
     private DrawerLayout mDrawerLayout;
     private long downloadId;
     private NetworkUtils mNetworkUtils;
-    private BottomSheetBehavior mBottomSheetBehavior;
     private LinearLayout linearLayout;
     View bottomSheet;
     Menu mMenu;
     MenuItem downloadHdMenuItem;
+    SimpleDateFormat simpleDateFormat;
+    String titleName;
+    String description;
+    String currentDate;
 
+    Uri uri;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -77,84 +89,37 @@ public class MainActivity extends AppCompatActivity implements DatePickerDialog.
 
         mNasaPictureImageView = findViewById(R.id.img_picture_view);
         mWebView = findViewById(R.id.wv_video_player);
-
         bottomSheet = findViewById(R.id.bottom_sheet);
-        mBottomSheetBehavior = BottomSheetBehavior.from(bottomSheet);
-
         mTitle = findViewById(R.id.title);
         mDescription = findViewById(R.id.description);
-
         mDrawerLayout = findViewById(R.id.drawer);
-
         constraintLayout = findViewById(R.id.constraint);
         linearLayout = findViewById(R.id.bottom_sheet);
-
-        mNetworkUtils = NetworkUtils.getInstance(this);
 
         constraintLayout.setVisibility(View.INVISIBLE);
         linearLayout.setVisibility(View.INVISIBLE);
 
+        mNetworkUtils = NetworkUtils.getInstance(this);
 
+        registerReceiver(onCompleteDownload, new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE));
 
-
-
-
-
-        IntentFilter filter = new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE);
-        registerReceiver(new BroadcastReceiver() {
-            @Override
-            public void onReceive(Context context,Intent intent) {
-                long broadcastedDownloadId = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID,-1);
-                if (broadcastedDownloadId == downloadId) {
-                    if (getDownloadStatus() == DownloadManager.STATUS_SUCCESSFUL) {
-                        Toast.makeText(MainActivity.this,"Download complete",Toast.LENGTH_SHORT).show();
-                    } else {
-                        Toast.makeText(MainActivity.this,"Download not complete",Toast.LENGTH_SHORT).show();
-
-                    }
-
-                }
-
-            }
-        },filter);
-
-
-        mBottomSheetBehavior.setBottomSheetCallback(new BottomSheetBehavior.BottomSheetCallback() {
-            @Override
-            public void onStateChanged(@NonNull View view,int i) {
-                switch (i) {
-                    case BottomSheetBehavior.STATE_COLLAPSED:
-                        Toast.makeText(MainActivity.this,"Collapsed",Toast.LENGTH_SHORT).show();
-                        break;
-
-                    case BottomSheetBehavior.STATE_DRAGGING:
-                        Toast.makeText(MainActivity.this,"Dragging",Toast.LENGTH_SHORT).show();
-                        break;
-
-                    case BottomSheetBehavior.STATE_EXPANDED:
-                        Toast.makeText(MainActivity.this,"Expanded",Toast.LENGTH_SHORT).show();
-                        break;
-
-                    case BottomSheetBehavior.STATE_HIDDEN:
-                        Toast.makeText(MainActivity.this,"Hidden",Toast.LENGTH_SHORT).show();
-                        break;
-
-                    case BottomSheetBehavior.STATE_SETTLING:
-                        Toast.makeText(MainActivity.this,"Settling",Toast.LENGTH_SHORT).show();
-                        break;
-                }
-            }
-
-            @Override
-            public void onSlide(@NonNull View view,float v) {
-
-            }
-        });
-
-
-
-        requestApod(null);
+        simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+        currentDate = simpleDateFormat.format(new Date());
+        requestApod(currentDate);
     }
+
+    private BroadcastReceiver onCompleteDownload = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context,Intent intent) {
+            long broadcastedDownloadId = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID,-1);
+            if (broadcastedDownloadId == downloadId) {
+                Toast.makeText(MainActivity.this,"Download complete",Toast.LENGTH_SHORT).show();
+            }  else {
+                Toast.makeText(MainActivity.this,"Download not complete",Toast.LENGTH_SHORT).show();
+
+            }
+        }
+    };
 
     @Override
     protected void onStop() {
@@ -162,87 +127,106 @@ public class MainActivity extends AppCompatActivity implements DatePickerDialog.
         mNetworkUtils.cancelRequest(TAG);
     }
 
-    private int getDownloadStatus() {
-        DownloadManager.Query query = new DownloadManager.Query();
-        query.setFilterById(downloadId);
-
-        DownloadManager downloadManager = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
-        Cursor cursor = downloadManager.query(query);
-
-        if (cursor.moveToFirst()) {
-            int columnIndex = cursor.getColumnIndex(DownloadManager.COLUMN_STATUS);
-            int status = cursor.getInt(columnIndex);
-
-            return status;
-        }
-        return DownloadManager.ERROR_UNKNOWN;
-    }
-
     @SuppressLint("ResourceType")
     public boolean onCreateOptionsMenu(Menu menu) {
         this.mMenu = menu;
-
         getMenuInflater().inflate(R.menu.main_menu,menu);
         downloadHdMenuItem = menu.findItem(R.id.action_download_hd);
         return true;
     }
 
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        unregisterReceiver(onCompleteDownload);
+    }
+
+    @RequiresApi(api = Build.VERSION_CODES.N)
     public boolean onOptionsItemSelected(MenuItem item) {
         if (item.getItemId() == R.id.action_pick_day) {
-            DialogFragment datePicker = new DatePickerFragment();
-            datePicker.show(getSupportFragmentManager(),"date picker");
+           showDatePicker();
 
         } else if (item.getItemId() == R.id.action_download_hd) {
-            if (mNasaPicture.getMediaType().equals("image")) {
-
-                    Uri uri = Uri.parse(mNasaPicture.getUrl());
-                    DownloadManager.Request request = new DownloadManager.Request(uri);
-                    request.setDescription("Download image");
-                    request.setDestinationInExternalFilesDir(this,Environment.DIRECTORY_DOWNLOADS,"download image");
-
-                    DownloadManager downloadManager = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
-                    downloadId = downloadManager.enqueue(request);
-            }
+            beginDownload();
 
         } else if (item.getItemId() == R.id.action_share) {
-            if (mNasaPicture.getMediaType().equals("image")) {
-                Bitmap mBitmap = ((BitmapDrawable) mNasaPictureImageView.getDrawable()).getBitmap();
-
-                String path = MediaStore.Images.Media.insertImage(getContentResolver(),
-                        mBitmap,mNasaPicture.getTitle(),null);
-                Uri imageUri = Uri.parse(path);
-                Intent intent = new Intent(Intent.ACTION_SEND);
-                intent.setType("image/*");
-                intent.putExtra(Intent.EXTRA_STREAM,imageUri);
-                intent.putExtra(Intent.EXTRA_TEXT,mNasaPicture.getTitle());
-                startActivity(Intent.createChooser(intent,"Select"));
-
-
-            } else if (mNasaPicture.getMediaType().equals("video")) {
-
-                Intent intent = new Intent();
-                intent.setAction(Intent.ACTION_SEND);
-                Uri uriVideo = Uri.parse(mNasaPicture.getUrl());
-
-                intent.putExtra(Intent.EXTRA_TEXT,mNasaPicture.getTitle() + "\n" + uriVideo);
-                intent.setType("text/plain");
-                startActivity(intent);
-            }
+            shareImageOrVideo();
 
         } else if (item.getItemId() == R.id.action_about) {
-            if (!mDrawerLayout.isDrawerOpen(GravityCompat.START)) {
-                mDrawerLayout.openDrawer(GravityCompat.START);
-                } else {
-                    mDrawerLayout.closeDrawer(GravityCompat.END);
-            }
+            showAbout();
 
-
-
-//            AboutFragment aboutFragment = new AboutFragment();
-//            aboutFragment.show(getSupportFragmentManager(), aboutFragment.getTag());
         }
         return super.onOptionsItemSelected(item);
     }
+
+    private void showDatePicker() {
+        DialogFragment datePicker = new DatePickerFragment();
+        datePicker.show(getSupportFragmentManager(),"date picker");
+    }
+
+    @RequiresApi(api = Build.VERSION_CODES.N)
+    private void beginDownload() {
+        if (mNasaPicture.getMediaType().equals("image")) {
+            uri = Uri.parse(mNasaPicture.getHdurl());
+            File file = new File(getExternalFilesDir(null),"Download file");
+            DownloadManager.Request request = null;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+
+                request = new DownloadManager.Request(uri);
+
+                request.setTitle("Data Download");
+                request.setDescription("Download image");
+                request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+                request.setDestinationUri(Uri.fromFile(file));
+                request.setRequiresCharging(false);
+                request.setAllowedOverMetered(true);
+                request.setAllowedOverRoaming(true);
+            } else {
+                request = new DownloadManager.Request(uri);
+
+                request.setTitle("Data Download");
+                request.setDescription("Download image");
+                request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+                request.setDestinationUri(Uri.fromFile(file));
+                request.setAllowedOverRoaming(true);
+            }
+            DownloadManager downloadManager = (DownloadManager) getSystemService(Context.DOWNLOAD_SERVICE);
+            downloadId = downloadManager.enqueue(request);
+
+        }
+
+    }
+
+    private void shareImageOrVideo() {
+        if (mNasaPicture.getMediaType().equals("image")) {
+            Bitmap mBitmap = ((BitmapDrawable) mNasaPictureImageView.getDrawable()).getBitmap();
+            String path = MediaStore.Images.Media.insertImage(getContentResolver(),
+                    mBitmap,mNasaPicture.getTitle(),null);
+            uri = Uri.parse(path);
+            Intent intent = new Intent(Intent.ACTION_SEND);
+            intent.setType("image/*");
+            intent.putExtra(Intent.EXTRA_STREAM,uri);
+            intent.putExtra(Intent.EXTRA_TEXT,mNasaPicture.getTitle());
+            startActivity(Intent.createChooser(intent,"Select"));
+
+        } else if (mNasaPicture.getMediaType().equals("video")) {
+            Intent intent = new Intent();
+            intent.setAction(Intent.ACTION_SEND);
+            uri = Uri.parse(mNasaPicture.getUrl());
+            intent.putExtra(Intent.EXTRA_TEXT,mNasaPicture.getTitle() + "\n" + uri);
+            intent.setType("text/plain");
+            startActivity(intent);
+        }
+    }
+
+    private void showAbout() {
+        if (!mDrawerLayout.isDrawerOpen(GravityCompat.START)) {
+            mDrawerLayout.openDrawer(GravityCompat.START);
+        } else {
+            mDrawerLayout.closeDrawer(GravityCompat.END);
+        }
+    }
+
 
     @Override
     public void onDateSet(DatePicker view,int year,int month,int dayOfMonth) {
@@ -251,19 +235,13 @@ public class MainActivity extends AppCompatActivity implements DatePickerDialog.
         calendar.set(Calendar.MONTH,month);
         calendar.set(Calendar.DAY_OF_MONTH,dayOfMonth);
 
-        SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd");
+        simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd");
         String date = simpleDateFormat.format(new Date(calendar.getTimeInMillis()));
         requestApod(date);
-
-
-
-
-
     }
 
     private void requestApod(String date) {
         String apod = NetworkUtils.getPictureUrl(MainActivity.this, date).toString();
-
         JsonObjectRequest apodRequest = new JsonObjectRequest(
                 Request.Method.GET,
                 apod,
@@ -273,14 +251,10 @@ public class MainActivity extends AppCompatActivity implements DatePickerDialog.
                     public void onResponse(JSONObject response) {
                         NasaPicture nasaPicture = null;
                         try {
-
-                            nasaPicture = OpenPictureDataParser.getPictureInfoObjectFromJson(response);
-
-
+                            nasaPicture = APODData.getPictureInfoObjectFromJson(response);
                         } catch (JSONException e) {
                             e.printStackTrace();
                         }
-
                         if (nasaPicture != null) {
                             updateApod(nasaPicture);
                             updateMenu();
@@ -289,18 +263,19 @@ public class MainActivity extends AppCompatActivity implements DatePickerDialog.
                         }
 
                     }
+
                 },
+
                 new Response.ErrorListener() {
                     @Override
                     public void onErrorResponse(VolleyError error) {
                         Toast.makeText(MainActivity.this,error.getMessage(),Toast.LENGTH_SHORT).show();
-
                     }
-                }
+                });
 
-        );
         apodRequest.setTag(TAG);
         mNetworkUtils.addRequestQueue(apodRequest);
+
     }
 
     private void showApod() {
@@ -320,11 +295,11 @@ public class MainActivity extends AppCompatActivity implements DatePickerDialog.
             mWebView.getSettings().setJavaScriptEnabled(true);
             mWebView.loadUrl(mNasaPicture.getUrl());
         }
-        String titleName = mNasaPicture.getTitle();
+        titleName = mNasaPicture.getTitle();
         mTitle.setText(titleName);
-
-        String description = mNasaPicture.getExplanation();
+        description = mNasaPicture.getExplanation();
         mDescription.setText(description);
+
     }
 
     private void updateApod(NasaPicture nasaPicture) {
@@ -337,6 +312,34 @@ public class MainActivity extends AppCompatActivity implements DatePickerDialog.
             downloadHdMenuItem.setVisible(true);
         } else if(mNasaPicture.getMediaType().equals("video")) {
             downloadHdMenuItem.setVisible(false);
+        }
+    }
+
+    @Override
+    public void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        adjustFullScreen(newConfig);
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) {
+            adjustFullScreen(getResources().getConfiguration());
+        }
+    }
+    private void adjustFullScreen(Configuration config) {
+        final View decorView = getWindow().getDecorView();
+        if (config.orientation == Configuration.ORIENTATION_LANDSCAPE) {
+            decorView.setSystemUiVisibility(
+                    View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                            | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                            | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                            | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                            | View.SYSTEM_UI_FLAG_FULLSCREEN
+                            | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+        } else {
+            decorView.setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
         }
     }
 
