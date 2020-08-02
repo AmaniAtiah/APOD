@@ -3,9 +3,6 @@ package com.barmej.astoronmypictureoftheday;
 import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.constraintlayout.widget.ConstraintLayout;
-import androidx.core.view.GravityCompat;
-import androidx.drawerlayout.widget.DrawerLayout;
-import androidx.fragment.app.DialogFragment;
 
 import android.annotation.SuppressLint;
 import android.app.DatePickerDialog;
@@ -14,7 +11,6 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.SharedPreferences;
 import android.content.res.Configuration;
 import android.graphics.Bitmap;
 import android.graphics.drawable.BitmapDrawable;
@@ -22,7 +18,6 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.MediaStore;
-import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -32,6 +27,7 @@ import android.widget.DatePicker;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
+
 import com.android.volley.Request;
 import com.android.volley.Response;
 import com.android.volley.VolleyError;
@@ -39,15 +35,13 @@ import com.android.volley.toolbox.JsonObjectRequest;
 import com.barmej.astoronmypictureoftheday.entity.NasaPicture;
 import com.barmej.astoronmypictureoftheday.network.NetworkUtils;
 import com.barmej.astoronmypictureoftheday.utils.APODData;
-import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
 import com.ortiz.touchview.TouchImageView;
 import com.squareup.picasso.Picasso;
+
 import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.File;
-import java.lang.reflect.Type;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
@@ -57,11 +51,6 @@ import java.util.Locale;
 public class MainActivity extends AppCompatActivity implements DatePickerDialog.OnDateSetListener {
 
     private static final String TAG = MainActivity.class.getSimpleName();
-    private static final String BUNDLE_CURRENT_ANSWER = "BUNDLE_CURRENT_ANSWER";
-    public static final String SHARED_PREFS = "SHARED_PREFS";
-    public static final String TEXT = "TEXT";
-    private static final String TYPE = "type";
-    private static final String TASK_LIST= "task list";
 
     private TouchImageView mNasaPictureImageView;
     private WebView mWebView;
@@ -69,19 +58,17 @@ public class MainActivity extends AppCompatActivity implements DatePickerDialog.
     private TextView mDescription;
     private ConstraintLayout constraintLayout;
     private NasaPicture mNasaPicture;
-    private DrawerLayout mDrawerLayout;
     private long downloadId;
     private NetworkUtils mNetworkUtils;
     private LinearLayout linearLayout;
-    View bottomSheet;
-    Menu mMenu;
-    MenuItem downloadHdMenuItem;
-    SimpleDateFormat simpleDateFormat;
-    String titleName;
-    String description;
-    String currentDate;
+    private MenuItem downloadHdMenuItem;
+    private SimpleDateFormat simpleDateFormat;
+    private String titleName;
+    private String description;
+    private String currentDate;
 
-    Uri uri;
+    private Uri uri;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -89,21 +76,18 @@ public class MainActivity extends AppCompatActivity implements DatePickerDialog.
 
         mNasaPictureImageView = findViewById(R.id.img_picture_view);
         mWebView = findViewById(R.id.wv_video_player);
-        bottomSheet = findViewById(R.id.bottom_sheet);
         mTitle = findViewById(R.id.title);
         mDescription = findViewById(R.id.description);
-        mDrawerLayout = findViewById(R.id.drawer);
         constraintLayout = findViewById(R.id.constraint);
         linearLayout = findViewById(R.id.bottom_sheet);
-
         constraintLayout.setVisibility(View.INVISIBLE);
         linearLayout.setVisibility(View.INVISIBLE);
 
         mNetworkUtils = NetworkUtils.getInstance(this);
 
-        registerReceiver(onCompleteDownload, new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE));
+        registerReceiver(onCompleteDownload,new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE));
 
-        simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+        simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd",Locale.getDefault());
         currentDate = simpleDateFormat.format(new Date());
         requestApod(currentDate);
     }
@@ -114,9 +98,8 @@ public class MainActivity extends AppCompatActivity implements DatePickerDialog.
             long broadcastedDownloadId = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID,-1);
             if (broadcastedDownloadId == downloadId) {
                 Toast.makeText(MainActivity.this,"Download complete",Toast.LENGTH_SHORT).show();
-            }  else {
+            } else {
                 Toast.makeText(MainActivity.this,"Download not complete",Toast.LENGTH_SHORT).show();
-
             }
         }
     };
@@ -129,7 +112,6 @@ public class MainActivity extends AppCompatActivity implements DatePickerDialog.
 
     @SuppressLint("ResourceType")
     public boolean onCreateOptionsMenu(Menu menu) {
-        this.mMenu = menu;
         getMenuInflater().inflate(R.menu.main_menu,menu);
         downloadHdMenuItem = menu.findItem(R.id.action_download_hd);
         return true;
@@ -144,7 +126,7 @@ public class MainActivity extends AppCompatActivity implements DatePickerDialog.
     @RequiresApi(api = Build.VERSION_CODES.N)
     public boolean onOptionsItemSelected(MenuItem item) {
         if (item.getItemId() == R.id.action_pick_day) {
-           showDatePicker();
+            showDatePicker();
 
         } else if (item.getItemId() == R.id.action_download_hd) {
             beginDownload();
@@ -160,7 +142,7 @@ public class MainActivity extends AppCompatActivity implements DatePickerDialog.
     }
 
     private void showDatePicker() {
-        DialogFragment datePicker = new DatePickerFragment();
+        DatePickerFragment datePicker = new DatePickerFragment();
         datePicker.show(getSupportFragmentManager(),"date picker");
     }
 
@@ -169,48 +151,32 @@ public class MainActivity extends AppCompatActivity implements DatePickerDialog.
         if (mNasaPicture.getMediaType().equals("image")) {
             uri = Uri.parse(mNasaPicture.getHdurl());
             File file = new File(getExternalFilesDir(null),"Download file");
-            DownloadManager.Request request = null;
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-
-                request = new DownloadManager.Request(uri);
-
-                request.setTitle("Data Download");
-                request.setDescription("Download image");
-                request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
-                request.setDestinationUri(Uri.fromFile(file));
-                request.setRequiresCharging(false);
-                request.setAllowedOverMetered(true);
-                request.setAllowedOverRoaming(true);
-            } else {
-                request = new DownloadManager.Request(uri);
-
-                request.setTitle("Data Download");
-                request.setDescription("Download image");
-                request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
-                request.setDestinationUri(Uri.fromFile(file));
-                request.setAllowedOverRoaming(true);
-            }
+            DownloadManager.Request request = new DownloadManager.Request(uri);
+            request.setTitle("Data Download");
+            request.setDescription("Download image");
+            request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+            request.setDestinationUri(Uri.fromFile(file));
+            request.setRequiresCharging(false);
+            request.setAllowedOverMetered(true);
+            request.setAllowedOverRoaming(true);
             DownloadManager downloadManager = (DownloadManager) getSystemService(Context.DOWNLOAD_SERVICE);
             downloadId = downloadManager.enqueue(request);
-
         }
-
     }
 
     private void shareImageOrVideo() {
+        Intent intent = new Intent(Intent.ACTION_SEND);
         if (mNasaPicture.getMediaType().equals("image")) {
             Bitmap mBitmap = ((BitmapDrawable) mNasaPictureImageView.getDrawable()).getBitmap();
             String path = MediaStore.Images.Media.insertImage(getContentResolver(),
                     mBitmap,mNasaPicture.getTitle(),null);
             uri = Uri.parse(path);
-            Intent intent = new Intent(Intent.ACTION_SEND);
             intent.setType("image/*");
             intent.putExtra(Intent.EXTRA_STREAM,uri);
             intent.putExtra(Intent.EXTRA_TEXT,mNasaPicture.getTitle());
             startActivity(Intent.createChooser(intent,"Select"));
 
         } else if (mNasaPicture.getMediaType().equals("video")) {
-            Intent intent = new Intent();
             intent.setAction(Intent.ACTION_SEND);
             uri = Uri.parse(mNasaPicture.getUrl());
             intent.putExtra(Intent.EXTRA_TEXT,mNasaPicture.getTitle() + "\n" + uri);
@@ -220,13 +186,9 @@ public class MainActivity extends AppCompatActivity implements DatePickerDialog.
     }
 
     private void showAbout() {
-        if (!mDrawerLayout.isDrawerOpen(GravityCompat.START)) {
-            mDrawerLayout.openDrawer(GravityCompat.START);
-        } else {
-            mDrawerLayout.closeDrawer(GravityCompat.END);
-        }
+        AboutFragment aboutFragment = new AboutFragment();
+        aboutFragment.show(getSupportFragmentManager(),"about");
     }
-
 
     @Override
     public void onDateSet(DatePicker view,int year,int month,int dayOfMonth) {
@@ -241,7 +203,7 @@ public class MainActivity extends AppCompatActivity implements DatePickerDialog.
     }
 
     private void requestApod(String date) {
-        String apod = NetworkUtils.getPictureUrl(MainActivity.this, date).toString();
+        String apod = NetworkUtils.getPictureUrl(MainActivity.this,date).toString();
         JsonObjectRequest apodRequest = new JsonObjectRequest(
                 Request.Method.GET,
                 apod,
@@ -261,7 +223,6 @@ public class MainActivity extends AppCompatActivity implements DatePickerDialog.
                             constraintLayout.setVisibility(View.VISIBLE);
                             linearLayout.setVisibility(View.VISIBLE);
                         }
-
                     }
 
                 },
@@ -275,14 +236,12 @@ public class MainActivity extends AppCompatActivity implements DatePickerDialog.
 
         apodRequest.setTag(TAG);
         mNetworkUtils.addRequestQueue(apodRequest);
-
     }
 
     private void showApod() {
         if (mNasaPicture.getMediaType().equals("image")) {
             mNasaPictureImageView.setVisibility(View.VISIBLE);
             mWebView.setVisibility(View.GONE);
-
             Picasso.get()
                     .load(mNasaPicture.getUrl())
                     .into(mNasaPictureImageView);
@@ -290,7 +249,6 @@ public class MainActivity extends AppCompatActivity implements DatePickerDialog.
         } else if (mNasaPicture.getMediaType().equals("video")) {
             mNasaPictureImageView.setVisibility(View.GONE);
             mWebView.setVisibility(View.VISIBLE);
-
             mWebView.setWebViewClient(new WebViewClient());
             mWebView.getSettings().setJavaScriptEnabled(true);
             mWebView.loadUrl(mNasaPicture.getUrl());
@@ -299,7 +257,6 @@ public class MainActivity extends AppCompatActivity implements DatePickerDialog.
         mTitle.setText(titleName);
         description = mNasaPicture.getExplanation();
         mDescription.setText(description);
-
     }
 
     private void updateApod(NasaPicture nasaPicture) {
@@ -307,10 +264,10 @@ public class MainActivity extends AppCompatActivity implements DatePickerDialog.
         showApod();
     }
 
-    private void updateMenu(){
+    private void updateMenu() {
         if (mNasaPicture.getMediaType().equals("image")) {
             downloadHdMenuItem.setVisible(true);
-        } else if(mNasaPicture.getMediaType().equals("video")) {
+        } else if (mNasaPicture.getMediaType().equals("video")) {
             downloadHdMenuItem.setVisible(false);
         }
     }
@@ -328,6 +285,7 @@ public class MainActivity extends AppCompatActivity implements DatePickerDialog.
             adjustFullScreen(getResources().getConfiguration());
         }
     }
+
     private void adjustFullScreen(Configuration config) {
         final View decorView = getWindow().getDecorView();
         if (config.orientation == Configuration.ORIENTATION_LANDSCAPE) {

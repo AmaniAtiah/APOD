@@ -16,14 +16,11 @@
     <string name="error_permissions_download_failed">Can\'t download the image!</string>
     <string name="error_permissions_share_failed">Can\'t share the content!</string>
 
-    <string name="navigation_drawer_open">Open navigation drawer</string>
-    <string name="navigation_drawer_close">Close navigation drawer</string>
-
 
     <!-- About Screen -->
     <string name="about_label">About</string>
     <string name="about_content">This application shows you appealing imagery from the universe with associated metadata and description every day.
-        This app uses official Apod API from <a href="https://api.nasa.gov/api.html#apod">NASA</a> but it\'s not the official NASA app.
+        This app uses official Apod API from <a href="https://api.nasa.gov/api.html#apod"> NASA</a> but it\'s not the official NASA app.
     </string>
 
     <!-- Share -->
