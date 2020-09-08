@@ -3,7 +3,6 @@ package com.barmej.astoronmypictureoftheday;
 import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.constraintlayout.widget.ConstraintLayout;
-
 import android.annotation.SuppressLint;
 import android.app.DatePickerDialog;
 import android.app.DownloadManager;
@@ -17,6 +16,7 @@ import android.graphics.drawable.BitmapDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
 import android.provider.MediaStore;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -27,7 +27,6 @@ import android.widget.DatePicker;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
-
 import com.android.volley.Request;
 import com.android.volley.Response;
 import com.android.volley.VolleyError;
@@ -37,10 +36,8 @@ import com.barmej.astoronmypictureoftheday.network.NetworkUtils;
 import com.barmej.astoronmypictureoftheday.utils.APODData;
 import com.ortiz.touchview.TouchImageView;
 import com.squareup.picasso.Picasso;
-
 import org.json.JSONException;
 import org.json.JSONObject;
-
 import java.io.File;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
@@ -66,8 +63,8 @@ public class MainActivity extends AppCompatActivity implements DatePickerDialog.
     private String titleName;
     private String description;
     private String currentDate;
-
     private Uri uri;
+    String date;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -80,16 +77,34 @@ public class MainActivity extends AppCompatActivity implements DatePickerDialog.
         mDescription = findViewById(R.id.description);
         constraintLayout = findViewById(R.id.constraint);
         linearLayout = findViewById(R.id.bottom_sheet);
-        constraintLayout.setVisibility(View.INVISIBLE);
-        linearLayout.setVisibility(View.INVISIBLE);
+
+        View.OnClickListener showHideListener  = new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                showSystemUI();
+                new Handler().postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        adjustFullScreen(getResources().getConfiguration());
+                    }
+                }, 3000);
+            }
+        };
+
+        mNasaPictureImageView.setOnClickListener(showHideListener);
+        mWebView.setOnClickListener(showHideListener);
 
         mNetworkUtils = NetworkUtils.getInstance(this);
+        mNasaPicture = new NasaPicture();
 
         registerReceiver(onCompleteDownload,new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE));
 
         simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd",Locale.getDefault());
         currentDate = simpleDateFormat.format(new Date());
-        requestApod(currentDate);
+
+        if (savedInstanceState == null) {
+            requestApod(currentDate);
+        }
     }
 
     private BroadcastReceiver onCompleteDownload = new BroadcastReceiver() {
@@ -114,6 +129,9 @@ public class MainActivity extends AppCompatActivity implements DatePickerDialog.
     public boolean onCreateOptionsMenu(Menu menu) {
         getMenuInflater().inflate(R.menu.main_menu,menu);
         downloadHdMenuItem = menu.findItem(R.id.action_download_hd);
+        if (mNasaPicture != null) {
+            updateMenu();
+        }
         return true;
     }
 
@@ -121,6 +139,50 @@ public class MainActivity extends AppCompatActivity implements DatePickerDialog.
     protected void onDestroy() {
         super.onDestroy();
         unregisterReceiver(onCompleteDownload);
+    }
+
+    @Override
+    public void onDateSet(DatePicker view,int year,int month,int dayOfMonth) {
+        Calendar calendar = Calendar.getInstance();
+        calendar.set(Calendar.YEAR,year);
+        calendar.set(Calendar.MONTH,month);
+        calendar.set(Calendar.DAY_OF_MONTH,dayOfMonth);
+
+        simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd");
+        date = simpleDateFormat.format(new Date(calendar.getTimeInMillis()));
+        requestApod(date);
+    }
+
+    @Override
+    public void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        adjustFullScreen(newConfig);
+
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) {
+            adjustFullScreen(getResources().getConfiguration());
+        } else {
+            showSystemUI();
+        }
+    }
+
+    @Override
+    public void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putParcelable("obj",mNasaPicture);
+    }
+
+    @Override
+    protected void onRestoreInstanceState(Bundle savedInstanceState) {
+        super.onRestoreInstanceState(savedInstanceState);
+        mNasaPicture = savedInstanceState.getParcelable("obj");
+        if (mNasaPicture != null) {
+            updateApod(mNasaPicture);
+        }
     }
 
     @RequiresApi(api = Build.VERSION_CODES.N)
@@ -190,18 +252,6 @@ public class MainActivity extends AppCompatActivity implements DatePickerDialog.
         aboutFragment.show(getSupportFragmentManager(),"about");
     }
 
-    @Override
-    public void onDateSet(DatePicker view,int year,int month,int dayOfMonth) {
-        Calendar calendar = Calendar.getInstance();
-        calendar.set(Calendar.YEAR,year);
-        calendar.set(Calendar.MONTH,month);
-        calendar.set(Calendar.DAY_OF_MONTH,dayOfMonth);
-
-        simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd");
-        String date = simpleDateFormat.format(new Date(calendar.getTimeInMillis()));
-        requestApod(date);
-    }
-
     private void requestApod(String date) {
         String apod = NetworkUtils.getPictureUrl(MainActivity.this,date).toString();
         JsonObjectRequest apodRequest = new JsonObjectRequest(
@@ -214,26 +264,25 @@ public class MainActivity extends AppCompatActivity implements DatePickerDialog.
                         NasaPicture nasaPicture = null;
                         try {
                             nasaPicture = APODData.getPictureInfoObjectFromJson(response);
+
                         } catch (JSONException e) {
                             e.printStackTrace();
                         }
                         if (nasaPicture != null) {
                             updateApod(nasaPicture);
                             updateMenu();
-                            constraintLayout.setVisibility(View.VISIBLE);
-                            linearLayout.setVisibility(View.VISIBLE);
+
+
                         }
                     }
 
                 },
-
                 new Response.ErrorListener() {
                     @Override
                     public void onErrorResponse(VolleyError error) {
                         Toast.makeText(MainActivity.this,error.getMessage(),Toast.LENGTH_SHORT).show();
                     }
                 });
-
         apodRequest.setTag(TAG);
         mNetworkUtils.addRequestQueue(apodRequest);
     }
@@ -261,28 +310,15 @@ public class MainActivity extends AppCompatActivity implements DatePickerDialog.
 
     private void updateApod(NasaPicture nasaPicture) {
         mNasaPicture = nasaPicture;
+        constraintLayout.setVisibility(View.VISIBLE);
         showApod();
     }
 
     private void updateMenu() {
-        if (mNasaPicture.getMediaType().equals("image")) {
+        if ("image".equals(mNasaPicture.getMediaType())) {
             downloadHdMenuItem.setVisible(true);
-        } else if (mNasaPicture.getMediaType().equals("video")) {
+        } else if ("video".equals(mNasaPicture.getMediaType())) {
             downloadHdMenuItem.setVisible(false);
-        }
-    }
-
-    @Override
-    public void onConfigurationChanged(Configuration newConfig) {
-        super.onConfigurationChanged(newConfig);
-        adjustFullScreen(newConfig);
-    }
-
-    @Override
-    public void onWindowFocusChanged(boolean hasFocus) {
-        super.onWindowFocusChanged(hasFocus);
-        if (hasFocus) {
-            adjustFullScreen(getResources().getConfiguration());
         }
     }
 
@@ -296,9 +332,19 @@ public class MainActivity extends AppCompatActivity implements DatePickerDialog.
                             | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
                             | View.SYSTEM_UI_FLAG_FULLSCREEN
                             | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+            linearLayout.setVisibility(View.INVISIBLE);
         } else {
             decorView.setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
         }
+    }
+
+    private void showSystemUI() {
+        View decorView = getWindow().getDecorView();
+        decorView.setSystemUiVisibility(
+                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                        | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                        | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN);
+        linearLayout.setVisibility(View.VISIBLE);
     }
 
 }
