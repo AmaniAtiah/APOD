@@ -25,5 +25,5 @@
     <!-- Share -->
     <string name="share">مشاركة</string>
     <string name="download_complete">تم التنزيل</string>
-    <string name="download_not_complete">التنزيل لم يكتمل</string>
+
 </resources>
