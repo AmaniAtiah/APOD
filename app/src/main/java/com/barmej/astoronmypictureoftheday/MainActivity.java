@@ -112,9 +112,9 @@ public class MainActivity extends AppCompatActivity implements DatePickerDialog.
         public void onReceive(Context context,Intent intent) {
             long broadcastedDownloadId = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID,-1);
             if (broadcastedDownloadId == downloadId) {
-                Toast.makeText(MainActivity.this,"download_complete",Toast.LENGTH_SHORT).show();
+                Toast.makeText(MainActivity.this,R.string.download_complete,Toast.LENGTH_SHORT).show();
             } else {
-                Toast.makeText(MainActivity.this,"download_not_complete",Toast.LENGTH_SHORT).show();
+                Toast.makeText(MainActivity.this,R.string.download_not_complete,Toast.LENGTH_SHORT).show();
             }
         }
     };
