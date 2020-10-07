@@ -164,8 +164,6 @@ public class MainActivity extends AppCompatActivity implements DatePickerDialog.
         super.onWindowFocusChanged(hasFocus);
         if (hasFocus) {
             adjustFullScreen(getResources().getConfiguration());
-        }else  {
-            showSystemUI();
         }
     }
 
