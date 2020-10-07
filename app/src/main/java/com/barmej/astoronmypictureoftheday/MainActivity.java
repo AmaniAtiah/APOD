@@ -112,9 +112,9 @@ public class MainActivity extends AppCompatActivity implements DatePickerDialog.
         public void onReceive(Context context,Intent intent) {
             long broadcastedDownloadId = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID,-1);
             if (broadcastedDownloadId == downloadId) {
-                Toast.makeText(MainActivity.this,"Download complete",Toast.LENGTH_SHORT).show();
+                Toast.makeText(MainActivity.this,R.string.download_complete,Toast.LENGTH_SHORT).show();
             } else {
-                Toast.makeText(MainActivity.this,"Download not complete",Toast.LENGTH_SHORT).show();
+                Toast.makeText(MainActivity.this,R.string.download_not_complete,Toast.LENGTH_SHORT).show();
             }
         }
     };
@@ -157,7 +157,6 @@ public class MainActivity extends AppCompatActivity implements DatePickerDialog.
     public void onConfigurationChanged(Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
         adjustFullScreen(newConfig);
-
     }
 
     @Override
@@ -165,8 +164,6 @@ public class MainActivity extends AppCompatActivity implements DatePickerDialog.
         super.onWindowFocusChanged(hasFocus);
         if (hasFocus) {
             adjustFullScreen(getResources().getConfiguration());
-        } else {
-            showSystemUI();
         }
     }
 
@@ -334,16 +331,13 @@ public class MainActivity extends AppCompatActivity implements DatePickerDialog.
                             | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
             linearLayout.setVisibility(View.INVISIBLE);
         } else {
-            decorView.setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
+            showSystemUI();
         }
     }
 
     private void showSystemUI() {
         View decorView = getWindow().getDecorView();
-        decorView.setSystemUiVisibility(
-                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                        | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                        | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN);
+        decorView.setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
         linearLayout.setVisibility(View.VISIBLE);
     }
 

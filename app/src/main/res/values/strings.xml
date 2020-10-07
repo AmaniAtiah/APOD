@@ -29,4 +29,7 @@
 
     <string name="api_key" translatable="false">XWGgI5MlA2KSlmr0cpmKEOWCR0DYrbwRikB3AZBE</string>
 
+    <string name="download_complete">Download complete</string>
+    <string name="download_not_complete">Download not complete</string>
+
 </resources>
